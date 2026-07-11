@@ -9,11 +9,6 @@
 
   <!-- PWA / iOS meta tags -->
   <meta name="viewport" content="width=device-width, initial-scale=1.0, viewport-fit=cover">
-  <!-- ВРЕМЕННО ОТКЛЮЧЕНО для A/B теста: этот патч (форсирующий
-       viewport-fit=cover на теге Flutter) — главный подозреваемый в
-       регрессии с белой полосой снизу, которой не было до его введения.
-  <script> ... </script>
-  -->
   <meta name="apple-mobile-web-app-capable" content="yes">
   <meta name="mobile-web-app-capable" content="yes">
   <meta name="apple-mobile-web-app-status-bar-style" content="black-translucent">
@@ -105,21 +100,20 @@
           window.dispatchEvent(new Event('resize'));
         } catch (e) {}
       }
-      // ВРЕМЕННО ОТКЛЮЧЕНО для A/B теста: патч viewport-fit на теге Flutter
-      // (подозреваемый в регрессии белой полосы). forceRemeasure() оставляем —
-      // проверяем, чинит ли он тапы САМ ПО СЕБЕ, без трогания viewport-fit.
-      // function patch(meta) {
-      //   if (meta.content.indexOf('viewport-fit') === -1) {
-      //     meta.content += ', viewport-fit=cover';
-      //     forceRemeasure();
-      //   }
-      // }
-      // const existing = document.querySelector('meta[flt-viewport]');
-      // if (existing) patch(existing);
-      // new MutationObserver(() => {
-      //   const meta = document.querySelector('meta[flt-viewport]');
-      //   if (meta) patch(meta);
-      // }).observe(document.head, {childList: true});
+      function patch(meta) {
+        if (meta.content.indexOf('viewport-fit') === -1) {
+          meta.content += ', viewport-fit=cover';
+          forceRemeasure();
+        }
+      }
+      const existing = document.querySelector('meta[flt-viewport]');
+      if (existing) patch(existing);
+      new MutationObserver(() => {
+        const meta = document.querySelector('meta[flt-viewport]');
+        if (meta) patch(meta);
+      }).observe(document.head, {childList: true});
+      // Подстраховка: если движок успел измерить размер раньше, чем сработал
+      // наш патч, форсим пересчёт ещё пару раз.
       [300, 1000].forEach((ms) => setTimeout(forceRemeasure, ms));
     })();
 
@@ -163,6 +157,35 @@
         window.visualViewport.addEventListener('resize', measure);
       }
       [300, 1000].forEach((ms) => setTimeout(measure, ms));
+    })();
+
+    // Замеры на устройстве показали: с активным viewport-fit-патчем канвас
+    // Flutter стартует ровно от top=0 (поэтому тапы совпадают с отрисовкой),
+    // но по высоте короче истинного экрана ровно на величину верхнего
+    // safe-area-inset — дефицит стабильно уходит вниз. Это похоже на баг
+    // WebKit в измерении clientHeight для standalone PWA с вырезом, а не
+    // на что-то, что чинится ещё одним мета-тегом. Перекрываем дефицит
+    // снизу сплошным цветом (конечный цвет градиента), раз знаем его
+    // точный размер — это компенсация, а не решение первопричины.
+    (function () {
+      const filler = document.createElement('div');
+      filler.style.cssText =
+        'position:fixed;left:0;right:0;bottom:0;z-index:1;' +
+        'background:#4FA733;pointer-events:none;height:0px;';
+      document.body.appendChild(filler);
+
+      function resizeFiller() {
+        const insets = window.__safeAreaInsets;
+        const deficit = insets ? insets.top : 0;
+        filler.style.height = deficit + 'px';
+      }
+
+      resizeFiller();
+      window.addEventListener('resize', resizeFiller);
+      if (window.visualViewport) {
+        window.visualViewport.addEventListener('resize', resizeFiller);
+      }
+      [300, 1000, 2000].forEach((ms) => setTimeout(resizeFiller, ms));
     })();
 
     // ВРЕМЕННЫЙ дебаг-оверлей — показывает реальные цифры вместо гаданий.
