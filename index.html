@@ -22,10 +22,10 @@
   <style>
     html {
       height: 100%;
+      height: 100dvh; /* точнее отражает реальную высоту на мобилках, чем % */
       margin: 0;
       overflow: hidden;
-      /* ВРЕМЕННО для диагностики белой полосы — яркий маркер вместо градиента. */
-      background: red;
+      background: linear-gradient(to bottom, #CFEFFF 0%, #7FD4F5 28%, #29C5EE 50%, #8BD34F 82%, #4FA733 100%);
     }
     body {
       /* Жёстко фиксируем геометрию страницы: на iOS PWA (standalone) любой
@@ -35,6 +35,7 @@
       inset: 0;
       width: 100%;
       height: 100%;
+      height: 100dvh;
       margin: 0;
       overflow: hidden;
       overscroll-behavior: none;
@@ -42,8 +43,6 @@
       -webkit-user-select: none;
       user-select: none;
       -webkit-tap-highlight-color: transparent;
-      /* ВРЕМЕННО для диагностики — другой яркий маркер. */
-      background: magenta;
     }
     input, textarea, [contenteditable] {
       -webkit-user-select: text;
