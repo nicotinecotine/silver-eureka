@@ -73,23 +73,50 @@
   </div>
   <script src="flutter_bootstrap.js" async></script>
   <script>
-    // iOS PWA (standalone) на старте иногда меряет geometry вьюпорта раньше,
-    // чем Safari её досчитает под safe area — движок Flutter потом никогда
-    // не перемеряет сам, из-за чего тапы уезжают от видимых кнопок.
-    // Насильно шлём resize несколько раз в первые секунды, чтобы Flutter
-    // пересчитал размеры и позицию канваса на уже стабильных значениях —
-    // без этого помогало только открыть/закрыть системную клавиатуру.
+    // Flutter web (FullPageEmbeddingStrategy) при инициализации удаляет ЛЮБОЙ
+    // наш <meta name="viewport"> и ставит свой — жёстко прошитый, БЕЗ
+    // viewport-fit=cover (см. full_page_embedding_strategy.dart в исходниках
+    // движка). Без viewport-fit=cover env(safe-area-inset-*) всегда равны 0,
+    // хотя реальный вырез (чёлка/остров) на экране есть — отсюда цветной шов
+    // и рассинхрон геометрии. Патчим тег движка сразу после создания.
     (function () {
-      function nudge() {
+      function forceRemeasure() {
+        // Патч viewport-fit сам по себе не толкает Flutter пересчитать
+        // document.documentElement.clientHeight — это происходит только по
+        // событию resize на visualViewport (full_page_dimensions_provider.dart).
+        // Форсим его сразу после патча, чтобы движок взял уже верную геометрию,
+        // а не ждал первого реального ресайза (клавиатура/поворот).
         try {
-          window.dispatchEvent(new Event('resize'));
           if (window.visualViewport) {
             window.visualViewport.dispatchEvent(new Event('resize'));
           }
+          window.dispatchEvent(new Event('resize'));
         } catch (e) {}
       }
-      [200, 500, 1000, 2000].forEach((ms) => setTimeout(nudge, ms));
+      function patch(meta) {
+        if (meta.content.indexOf('viewport-fit') === -1) {
+          meta.content += ', viewport-fit=cover';
+          forceRemeasure();
+        }
+      }
+      const existing = document.querySelector('meta[flt-viewport]');
+      if (existing) patch(existing);
+      new MutationObserver(() => {
+        const meta = document.querySelector('meta[flt-viewport]');
+        if (meta) patch(meta);
+      }).observe(document.head, {childList: true});
+      // Подстраховка: если движок успел измерить размер раньше, чем сработал
+      // наш патч, форсим пересчёт ещё пару раз.
+      [300, 1000].forEach((ms) => setTimeout(forceRemeasure, ms));
     })();
+
+    // Официальное событие первого кадра движка — убираем лоадер по нему,
+    // а не полагаемся на то, что канвас Flutter «сам перекроет» div навсегда
+    // (иначе он остаётся в DOM и вылезает при ресайзе вьюпорта клавиатурой).
+    window.addEventListener('flutter-first-frame', function () {
+      const loading = document.getElementById('loading');
+      if (loading) loading.remove();
+    });
   </script>
 </body>
 </html>
