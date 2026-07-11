@@ -43,6 +43,11 @@
       -webkit-user-select: none;
       user-select: none;
       -webkit-tap-highlight-color: transparent;
+      /* Тест с диагностическим цветом показал: именно body (через
+         position:fixed;inset:0) реально дотягивается до истинного низа
+         экрана, а html — нет (несмотря на 100%/100dvh). Раньше фон висел
+         только на html, поэтому в зазоре был дефолтный белый браузера. */
+      background: linear-gradient(to bottom, #CFEFFF 0%, #7FD4F5 28%, #29C5EE 50%, #8BD34F 82%, #4FA733 100%);
     }
     input, textarea, [contenteditable] {
       -webkit-user-select: text;
