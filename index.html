@@ -9,6 +9,46 @@
 
   <!-- PWA / iOS meta tags -->
   <meta name="viewport" content="width=device-width, initial-scale=1.0, viewport-fit=cover">
+  <script>
+    // Flutter (FullPageEmbeddingStrategy) удаляет наш <meta viewport> и ставит
+    // свой, без viewport-fit=cover, через JS (.content = '...'). Замеры на
+    // устройстве показали: патчить content ПОСЛЕ того, как Flutter его уже
+    // выставил, не помогает — innerHeight/clientHeight остаются короче
+    // истинной высоты на величину выреза, будто Safari фиксирует решение
+    // о safe area в момент первой установки и не пересматривает его при
+    // поздней мутации. Поэтому перехватываем сам сеттер content ДО того,
+    // как движок вообще успеет его вызвать — синхронно, в <head>, раньше
+    // flutter_bootstrap.js.
+    (function () {
+      function ensureCover(value) {
+        if (typeof value !== 'string') return value;
+        return value.indexOf('viewport-fit') === -1 ? value + ', viewport-fit=cover' : value;
+      }
+
+      const proto = HTMLMetaElement.prototype;
+      const contentDesc = Object.getOwnPropertyDescriptor(proto, 'content');
+      if (contentDesc && contentDesc.set) {
+        Object.defineProperty(proto, 'content', {
+          configurable: true,
+          enumerable: contentDesc.enumerable,
+          get: contentDesc.get,
+          set: function (value) {
+            const isViewport = this.getAttribute('name') === 'viewport' || this.name === 'viewport';
+            contentDesc.set.call(this, isViewport ? ensureCover(value) : value);
+          },
+        });
+      }
+
+      const originalSetAttribute = Element.prototype.setAttribute;
+      Element.prototype.setAttribute = function (name, value) {
+        if (this.tagName === 'META' && name === 'content') {
+          const isViewport = this.getAttribute('name') === 'viewport' || this.name === 'viewport';
+          if (isViewport) value = ensureCover(value);
+        }
+        return originalSetAttribute.call(this, name, value);
+      };
+    })();
+  </script>
   <meta name="apple-mobile-web-app-capable" content="yes">
   <meta name="mobile-web-app-capable" content="yes">
   <meta name="apple-mobile-web-app-status-bar-style" content="black-translucent">
