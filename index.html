@@ -164,17 +164,54 @@
     (function () {
       const box = document.createElement('div');
       box.style.cssText =
-        'position:fixed;left:4px;top:4px;z-index:999999;' +
-        'background:rgba(0,0,0,0.75);color:#0f0;font:10px monospace;' +
-        'padding:6px;white-space:pre;pointer-events:none;';
+        'position:fixed;left:4px;top:4px;right:4px;bottom:4px;z-index:999999;' +
+        'background:rgba(0,0,0,0.85);color:#0f0;font:9px monospace;' +
+        'padding:6px;white-space:pre;overflow:auto;pointer-events:auto;';
       document.body.appendChild(box);
 
+      // Ищем canvas рекурсивно, пробивая shadow DOM — Flutter прячет свой
+      // рендер внутрь кастомных элементов (flt-glass-pane и т.п.).
+      function findAllCanvases(root, acc) {
+        acc = acc || [];
+        const walk = (node) => {
+          if (!node) return;
+          if (node.tagName === 'CANVAS') acc.push(node);
+          if (node.shadowRoot) walk(node.shadowRoot);
+          const children = node.children || [];
+          for (const child of children) walk(child);
+        };
+        walk(root);
+        return acc;
+      }
+
+      function describeTree(node, depth) {
+        depth = depth || 0;
+        if (depth > 4 || !node) return '';
+        const tag = node.tagName ? node.tagName.toLowerCase() : '#doc';
+        let rectStr = '';
+        if (node.getBoundingClientRect) {
+          const r = node.getBoundingClientRect();
+          rectStr = ` h=${r.height.toFixed(0)} top=${r.top.toFixed(0)}`;
+        }
+        let out = '  '.repeat(depth) + tag + rectStr + '\n';
+        if (node.shadowRoot) {
+          out += '  '.repeat(depth + 1) + '#shadow\n';
+          for (const child of node.shadowRoot.children || []) {
+            out += describeTree(child, depth + 2);
+          }
+        }
+        for (const child of node.children || []) {
+          out += describeTree(child, depth + 1);
+        }
+        return out;
+      }
+
       function fmt() {
-        const canvases = Array.from(document.querySelectorAll('canvas'));
+        const canvases = findAllCanvases(document.body);
         const canvasInfo = canvases
           .map((c, i) => {
             const r = c.getBoundingClientRect();
-            return `canvas${i}: rect.h=${r.height.toFixed(1)} style.h=${c.style.height} attr.h=${c.height}`;
+            return `canvas${i}: rect.h=${r.height.toFixed(1)} top=${r.top.toFixed(1)} style.h=${c.style.height} attr.h=${c.height}`;
           })
           .join('\n');
         const bodyRect = document.body.getBoundingClientRect();
@@ -188,7 +225,9 @@
           `body.rect.h=${bodyRect.height.toFixed(1)} top=${bodyRect.top.toFixed(1)}`,
           `dpr=${window.devicePixelRatio}`,
           `safeBottom=${window.__safeAreaInsets ? window.__safeAreaInsets.bottom : 'n/a'}`,
-          canvasInfo || 'canvas: none yet',
+          canvasInfo || 'canvas: none (даже в shadow DOM)',
+          '--- tree ---',
+          describeTree(document.body, 0),
         ].join('\n');
       }
 
