@@ -23,7 +23,8 @@
     html, body {
       height: 100%;
       margin: 0;
-      background-color: #CFEFFF;
+      background: linear-gradient(to bottom, #CFEFFF 0%, #7FD4F5 28%, #29C5EE 50%, #8BD34F 82%, #4FA733 100%);
+      background-attachment: fixed;
       overscroll-behavior: none;
       touch-action: manipulation;
       -webkit-user-select: none;
@@ -34,9 +35,30 @@
       -webkit-user-select: text;
       user-select: text;
     }
+    #loading {
+      position: fixed;
+      inset: 0;
+      display: flex;
+      flex-direction: column;
+      align-items: center;
+      justify-content: center;
+      gap: 16px;
+    }
+    #loading img {
+      width: 96px;
+      height: 96px;
+      animation: loading-bounce 0.9s ease-in-out infinite;
+    }
+    @keyframes loading-bounce {
+      0%, 100% { transform: translateY(0) scale(1); }
+      50% { transform: translateY(-18px) scale(1.05); }
+    }
   </style>
 </head>
 <body>
+  <div id="loading">
+    <img src="icons/loading_pig.png" alt="">
+  </div>
   <script src="flutter_bootstrap.js" async></script>
 </body>
 </html>
