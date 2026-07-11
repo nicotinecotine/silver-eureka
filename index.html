@@ -24,7 +24,8 @@
       height: 100%;
       margin: 0;
       overflow: hidden;
-      background: linear-gradient(to bottom, #CFEFFF 0%, #7FD4F5 28%, #29C5EE 50%, #8BD34F 82%, #4FA733 100%);
+      /* ВРЕМЕННО для диагностики белой полосы — яркий маркер вместо градиента. */
+      background: red;
     }
     body {
       /* Жёстко фиксируем геометрию страницы: на iOS PWA (standalone) любой
@@ -41,6 +42,8 @@
       -webkit-user-select: none;
       user-select: none;
       -webkit-tap-highlight-color: transparent;
+      /* ВРЕМЕННО для диагностики — другой яркий маркер. */
+      background: magenta;
     }
     input, textarea, [contenteditable] {
       -webkit-user-select: text;
