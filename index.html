@@ -1,7 +1,7 @@
 <!DOCTYPE html>
 <html>
 <head>
-  <base href="/silver-eureka/">
+  <base href="/">
 
   <meta charset="UTF-8">
   <meta content="IE=Edge" http-equiv="X-UA-Compatible">
@@ -72,5 +72,24 @@
     <img src="icons/loading_pig.png" alt="">
   </div>
   <script src="flutter_bootstrap.js" async></script>
+  <script>
+    // iOS PWA (standalone) на старте иногда меряет geometry вьюпорта раньше,
+    // чем Safari её досчитает под safe area — движок Flutter потом никогда
+    // не перемеряет сам, из-за чего тапы уезжают от видимых кнопок.
+    // Насильно шлём resize несколько раз в первые секунды, чтобы Flutter
+    // пересчитал размеры и позицию канваса на уже стабильных значениях —
+    // без этого помогало только открыть/закрыть системную клавиатуру.
+    (function () {
+      function nudge() {
+        try {
+          window.dispatchEvent(new Event('resize'));
+          if (window.visualViewport) {
+            window.visualViewport.dispatchEvent(new Event('resize'));
+          }
+        } catch (e) {}
+      }
+      [200, 500, 1000, 2000].forEach((ms) => setTimeout(nudge, ms));
+    })();
+  </script>
 </body>
 </html>
