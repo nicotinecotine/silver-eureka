@@ -177,7 +177,11 @@
       function resizeFiller() {
         const insets = window.__safeAreaInsets;
         const deficit = insets ? insets.top : 0;
-        filler.style.height = deficit + 'px';
+        // ТЕСТ: специально перелезаем за границу bottom:0 отрицательным
+        // отступом — проверяем, красится ли что-то физически ЗА тем, что
+        // сейчас считается «низом» страницы, или там жёсткий обрез ОС.
+        filler.style.bottom = -deficit + 'px';
+        filler.style.height = deficit * 2 + 'px';
       }
 
       resizeFiller();
