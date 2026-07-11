@@ -117,6 +117,40 @@
       const loading = document.getElementById('loading');
       if (loading) loading.remove();
     });
+
+    // MediaQuery.padding у Flutter web ВСЕГДА 0 сверху и не даёт нижний
+    // safe-area инсет вне клавиатуры (см. full_page_dimensions_provider.dart —
+    // top жёстко захардкожен, это не баг конкретно нашего фикса, а
+    // ограничение движка). SafeArea() в Dart из-за этого не работает.
+    // Меряем настоящие env(safe-area-inset-*) сами через скрытый зонд и
+    // кладём в window, чтобы Dart-код читал их напрямую вместо MediaQuery.
+    (function () {
+      const probe = document.createElement('div');
+      probe.style.cssText =
+        'position:fixed;inset:0;visibility:hidden;pointer-events:none;' +
+        'padding-top:env(safe-area-inset-top);' +
+        'padding-right:env(safe-area-inset-right);' +
+        'padding-bottom:env(safe-area-inset-bottom);' +
+        'padding-left:env(safe-area-inset-left);';
+      document.body.appendChild(probe);
+
+      function measure() {
+        const cs = getComputedStyle(probe);
+        window.__safeAreaInsets = {
+          top: parseFloat(cs.paddingTop) || 0,
+          right: parseFloat(cs.paddingRight) || 0,
+          bottom: parseFloat(cs.paddingBottom) || 0,
+          left: parseFloat(cs.paddingLeft) || 0,
+        };
+      }
+
+      measure();
+      window.addEventListener('resize', measure);
+      if (window.visualViewport) {
+        window.visualViewport.addEventListener('resize', measure);
+      }
+      [300, 1000].forEach((ms) => setTimeout(measure, ms));
+    })();
   </script>
 </body>
 </html>
