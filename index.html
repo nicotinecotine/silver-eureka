@@ -11,7 +11,14 @@
   <meta name="viewport" content="width=device-width, initial-scale=1.0, viewport-fit=cover">
   <meta name="apple-mobile-web-app-capable" content="yes">
   <meta name="mobile-web-app-capable" content="yes">
-  <meta name="apple-mobile-web-app-status-bar-style" content="black-translucent">
+  <!-- default вместо black-translucent: НЕ оверлейный, стандартный
+       статус-бар. На устройстве железно подтверждено, что нижняя safe area
+       в оверлейном (black-translucent) режиме standalone PWA физически
+       не дорисовывается никаким CSS/JS — это обрез на уровне iOS, а не
+       баг нашего кода (проверено даже отрицательным bottom-оффсетом).
+       В обычном (не оверлейном) режиме страница получает от системы
+       честный, полностью пригодный для рисования вьюпорт без дыр. -->
+  <meta name="apple-mobile-web-app-status-bar-style" content="default">
   <meta name="apple-mobile-web-app-title" content="moi kroshki...">
   <meta name="theme-color" content="#FF6B4A">
   <link rel="apple-touch-icon" href="icons/Icon-192.png">
@@ -22,15 +29,12 @@
   <style>
     html {
       height: 100%;
-      height: 100dvh; /* точнее отражает реальную высоту на мобилках, чем % */
+      height: 100dvh;
       margin: 0;
       overflow: hidden;
       background: linear-gradient(to bottom, #CFEFFF 0%, #7FD4F5 28%, #29C5EE 50%, #8BD34F 82%, #4FA733 100%);
     }
     body {
-      /* Жёстко фиксируем геометрию страницы: на iOS PWA (standalone) любой
-         дрейф/боунс внешней страницы рассинхронизирует координаты тапов
-         с тем, что реально отрисовано в канвасе Flutter. */
       position: fixed;
       inset: 0;
       width: 100%;
@@ -43,10 +47,6 @@
       -webkit-user-select: none;
       user-select: none;
       -webkit-tap-highlight-color: transparent;
-      /* Тест с диагностическим цветом показал: именно body (через
-         position:fixed;inset:0) реально дотягивается до истинного низа
-         экрана, а html — нет (несмотря на 100%/100dvh). Раньше фон висел
-         только на html, поэтому в зазоре был дефолтный белый браузера. */
       background: linear-gradient(to bottom, #CFEFFF 0%, #7FD4F5 28%, #29C5EE 50%, #8BD34F 82%, #4FA733 100%);
     }
     input, textarea, [contenteditable] {
@@ -80,57 +80,18 @@
   </div>
   <script src="flutter_bootstrap.js" async></script>
   <script>
-    // Flutter web (FullPageEmbeddingStrategy) при инициализации удаляет ЛЮБОЙ
-    // наш <meta name="viewport"> и ставит свой — жёстко прошитый, БЕЗ
-    // viewport-fit=cover (см. full_page_embedding_strategy.dart в исходниках
-    // движка). Без viewport-fit=cover env(safe-area-inset-*) всегда равны 0,
-    // хотя реальный вырез (чёлка/остров) на экране есть — отсюда цветной шов
-    // и рассинхрон геометрии. Патчим тег движка сразу после создания.
-    (function () {
-      function forceRemeasure() {
-        // Патч viewport-fit сам по себе не толкает Flutter пересчитать
-        // document.documentElement.clientHeight — это происходит только по
-        // событию resize на visualViewport (full_page_dimensions_provider.dart).
-        // Форсим его сразу после патча, чтобы движок взял уже верную геометрию,
-        // а не ждал первого реального ресайза (клавиатура/поворот).
-        try {
-          if (window.visualViewport) {
-            window.visualViewport.dispatchEvent(new Event('resize'));
-          }
-          window.dispatchEvent(new Event('resize'));
-        } catch (e) {}
-      }
-      function patch(meta) {
-        if (meta.content.indexOf('viewport-fit') === -1) {
-          meta.content += ', viewport-fit=cover';
-          forceRemeasure();
-        }
-      }
-      const existing = document.querySelector('meta[flt-viewport]');
-      if (existing) patch(existing);
-      new MutationObserver(() => {
-        const meta = document.querySelector('meta[flt-viewport]');
-        if (meta) patch(meta);
-      }).observe(document.head, {childList: true});
-      // Подстраховка: если движок успел измерить размер раньше, чем сработал
-      // наш патч, форсим пересчёт ещё пару раз.
-      [300, 1000].forEach((ms) => setTimeout(forceRemeasure, ms));
-    })();
-
     // Официальное событие первого кадра движка — убираем лоадер по нему,
-    // а не полагаемся на то, что канвас Flutter «сам перекроет» div навсегда
-    // (иначе он остаётся в DOM и вылезает при ресайзе вьюпорта клавиатурой).
+    // а не полагаемся на то, что канвас Flutter «сам перекроет» div навсегда.
     window.addEventListener('flutter-first-frame', function () {
       const loading = document.getElementById('loading');
       if (loading) loading.remove();
     });
 
-    // MediaQuery.padding у Flutter web ВСЕГДА 0 сверху и не даёт нижний
-    // safe-area инсет вне клавиатуры (см. full_page_dimensions_provider.dart —
-    // top жёстко захардкожен, это не баг конкретно нашего фикса, а
-    // ограничение движка). SafeArea() в Dart из-за этого не работает.
-    // Меряем настоящие env(safe-area-inset-*) сами через скрытый зонд и
-    // кладём в window, чтобы Dart-код читал их напрямую вместо MediaQuery.
+    // MediaQuery.padding у Flutter web не отдаёт реальные отступы под
+    // безопасные зоны (см. full_page_dimensions_provider.dart в исходниках
+    // движка). Меряем настоящие env(safe-area-inset-*) сами через скрытый
+    // зонд и кладём в window, чтобы Dart-код (AppSafeArea) читал их
+    // напрямую вместо сломанного MediaQuery.
     (function () {
       const probe = document.createElement('div');
       probe.style.cssText =
@@ -157,117 +118,6 @@
         window.visualViewport.addEventListener('resize', measure);
       }
       [300, 1000].forEach((ms) => setTimeout(measure, ms));
-    })();
-
-    // Замеры на устройстве показали: с активным viewport-fit-патчем канвас
-    // Flutter стартует ровно от top=0 (поэтому тапы совпадают с отрисовкой),
-    // но по высоте короче истинного экрана ровно на величину верхнего
-    // safe-area-inset — дефицит стабильно уходит вниз. Это похоже на баг
-    // WebKit в измерении clientHeight для standalone PWA с вырезом, а не
-    // на что-то, что чинится ещё одним мета-тегом. Перекрываем дефицит
-    // снизу сплошным цветом (конечный цвет градиента), раз знаем его
-    // точный размер — это компенсация, а не решение первопричины.
-    (function () {
-      const filler = document.createElement('div');
-      filler.style.cssText =
-        'position:fixed;left:0;right:0;bottom:0;z-index:1;' +
-        'background:#4FA733;pointer-events:none;height:0px;';
-      document.body.appendChild(filler);
-
-      function resizeFiller() {
-        const insets = window.__safeAreaInsets;
-        const deficit = insets ? insets.top : 0;
-        // ТЕСТ: специально перелезаем за границу bottom:0 отрицательным
-        // отступом — проверяем, красится ли что-то физически ЗА тем, что
-        // сейчас считается «низом» страницы, или там жёсткий обрез ОС.
-        filler.style.bottom = -deficit + 'px';
-        filler.style.height = deficit * 2 + 'px';
-      }
-
-      resizeFiller();
-      window.addEventListener('resize', resizeFiller);
-      if (window.visualViewport) {
-        window.visualViewport.addEventListener('resize', resizeFiller);
-      }
-      [300, 1000, 2000].forEach((ms) => setTimeout(resizeFiller, ms));
-    })();
-
-    // ВРЕМЕННЫЙ дебаг-оверлей — показывает реальные цифры вместо гаданий.
-    // Убрать после того, как разберёмся с белой полосой.
-    (function () {
-      const box = document.createElement('div');
-      box.style.cssText =
-        'position:fixed;left:4px;top:4px;max-width:55vw;max-height:40vh;z-index:999999;' +
-        'background:rgba(0,0,0,0.85);color:#0f0;font:8px monospace;' +
-        'padding:6px;white-space:pre;overflow:auto;pointer-events:none;';
-      document.body.appendChild(box);
-
-      // Ищем canvas рекурсивно, пробивая shadow DOM — Flutter прячет свой
-      // рендер внутрь кастомных элементов (flt-glass-pane и т.п.).
-      function findAllCanvases(root, acc) {
-        acc = acc || [];
-        const walk = (node) => {
-          if (!node) return;
-          if (node.tagName === 'CANVAS') acc.push(node);
-          if (node.shadowRoot) walk(node.shadowRoot);
-          const children = node.children || [];
-          for (const child of children) walk(child);
-        };
-        walk(root);
-        return acc;
-      }
-
-      function describeTree(node, depth) {
-        depth = depth || 0;
-        if (depth > 4 || !node) return '';
-        const tag = node.tagName ? node.tagName.toLowerCase() : '#doc';
-        let rectStr = '';
-        if (node.getBoundingClientRect) {
-          const r = node.getBoundingClientRect();
-          rectStr = ` h=${r.height.toFixed(0)} top=${r.top.toFixed(0)}`;
-        }
-        let out = '  '.repeat(depth) + tag + rectStr + '\n';
-        if (node.shadowRoot) {
-          out += '  '.repeat(depth + 1) + '#shadow\n';
-          for (const child of node.shadowRoot.children || []) {
-            out += describeTree(child, depth + 2);
-          }
-        }
-        for (const child of node.children || []) {
-          out += describeTree(child, depth + 1);
-        }
-        return out;
-      }
-
-      function fmt() {
-        const canvases = findAllCanvases(document.body);
-        const canvasInfo = canvases
-          .map((c, i) => {
-            const r = c.getBoundingClientRect();
-            return `canvas${i}: rect.h=${r.height.toFixed(1)} top=${r.top.toFixed(1)} style.h=${c.style.height} attr.h=${c.height}`;
-          })
-          .join('\n');
-        const bodyRect = document.body.getBoundingClientRect();
-        const htmlRect = document.documentElement.getBoundingClientRect();
-        const vv = window.visualViewport;
-        return [
-          `innerHeight=${window.innerHeight}`,
-          `vvHeight=${vv ? vv.height.toFixed(1) : 'n/a'} vvOffsetTop=${vv ? vv.offsetTop.toFixed(1) : 'n/a'}`,
-          `docEl.clientHeight=${document.documentElement.clientHeight}`,
-          `html.rect.h=${htmlRect.height.toFixed(1)} top=${htmlRect.top.toFixed(1)}`,
-          `body.rect.h=${bodyRect.height.toFixed(1)} top=${bodyRect.top.toFixed(1)}`,
-          `dpr=${window.devicePixelRatio}`,
-          `safeBottom=${window.__safeAreaInsets ? window.__safeAreaInsets.bottom : 'n/a'}`,
-          canvasInfo || 'canvas: none (даже в shadow DOM)',
-          '--- tree ---',
-          describeTree(document.body, 0),
-        ].join('\n');
-      }
-
-      box.textContent = fmt();
-      setInterval(() => {
-        box.textContent = fmt();
-      }, 500);
     })();
   </script>
 </body>
