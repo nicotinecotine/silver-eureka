@@ -8,7 +8,7 @@
   <meta name="description" content="moi kroshki... — подсказчик еды">
 
   <!-- PWA / iOS meta tags -->
-  <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no, viewport-fit=cover">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0, viewport-fit=cover">
   <meta name="apple-mobile-web-app-capable" content="yes">
   <meta name="mobile-web-app-capable" content="yes">
   <meta name="apple-mobile-web-app-status-bar-style" content="black-translucent">
@@ -20,11 +20,22 @@
   <title>moi kroshki...</title>
   <link rel="manifest" href="manifest.json">
   <style>
-    html, body {
+    html {
       height: 100%;
       margin: 0;
+      overflow: hidden;
       background: linear-gradient(to bottom, #CFEFFF 0%, #7FD4F5 28%, #29C5EE 50%, #8BD34F 82%, #4FA733 100%);
-      background-attachment: fixed;
+    }
+    body {
+      /* Жёстко фиксируем геометрию страницы: на iOS PWA (standalone) любой
+         дрейф/боунс внешней страницы рассинхронизирует координаты тапов
+         с тем, что реально отрисовано в канвасе Flutter. */
+      position: fixed;
+      inset: 0;
+      width: 100%;
+      height: 100%;
+      margin: 0;
+      overflow: hidden;
       overscroll-behavior: none;
       touch-action: manipulation;
       -webkit-user-select: none;
@@ -43,6 +54,7 @@
       align-items: center;
       justify-content: center;
       gap: 16px;
+      background: linear-gradient(to bottom, #CFEFFF 0%, #7FD4F5 28%, #29C5EE 50%, #8BD34F 82%, #4FA733 100%);
     }
     #loading img {
       width: 96px;
